@@ -1,22 +1,25 @@
-"""
-URL configuration for washint_server project.
+# myproject/urls.py
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+
+# Import your ViewSet from its location
+from w_server.views import UserViewSet
+
+# Create a router instance
+router = DefaultRouter()
+
+# Register the ViewSet with a URL prefix.
+router.register(r'users', UserViewSet, basename='user')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    # THIS IS THE CRITICAL LINE:
+    # It tells Django to include all the router's URLs under the 'api/' path.
+    path('api/', include(router.urls)),
+
+    # This is for the browsable API's login/logout, which is a good practice to include.
+    path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
 ]
