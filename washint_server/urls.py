@@ -5,13 +5,14 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 # Import your ViewSet from its location
-from w_server.views import UserViewSet
+from w_server.views import UserViewSet,UserProfileViewSets
 
 # Create a router instance
 router = DefaultRouter()
 
 # Register the ViewSet with a URL prefix.
 router.register(r'users', UserViewSet, basename='user')
+router.register(r'profiles',UserProfileViewSets,basename='profile')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

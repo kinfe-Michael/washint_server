@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User
+from .models import User,UserProfile
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -26,3 +26,13 @@ class UserSerializer(serializers.ModelSerializer):
             user.set_password(password)
             user.save()
         return user
+class UserProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username',read_only=True)
+    class Meta:
+        model = UserProfile
+        fields = [
+              'id', 'username', 'display_name', 'profile_picture_url', 
+            'bio', 'followers_count', 'following_count',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'username', 'followers_count', 'following_count', 'created_at', 'updated_at']
