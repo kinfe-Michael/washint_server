@@ -1,10 +1,12 @@
 # books/views.py
 
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions,status
 from .models import User,UserProfile
+from rest_framework.decorators import action
 from .serializers import UserSerializer,UserProfileSerializer
 from .permissions import IsUserOrAdmin,IsOwnerOrReadOnly # Import your new permission class
 from rest_framework.exceptions import ValidationError
+from rest_framework.response import Response
 class UserViewSet(viewsets.ModelViewSet):
     """
     A ViewSet for viewing and editing user instances.
@@ -28,6 +30,24 @@ class UserViewSet(viewsets.ModelViewSet):
         else:
             # The user must be authenticated, and either an admin or the object owner.
             return [permissions.IsAuthenticated(), IsUserOrAdmin()]
+    @action(detail=False, methods=['get'])
+    def check_username(self,request):
+        username = request.query_params.get('username',None)
+        if username is None:
+            return Response(
+                {'message':'please provide a user name to check.'}
+            )
+        is_taken = User.objects.filter(username__iexact = username)
+        if is_taken:
+            return Response (
+                {'is_avaliable':False,'message':'This username is already taken.'},
+                status=status.HTTP_200_OK
+            )
+        else:
+            return Response (
+                {'is_avaliable':True,'message':'This username is avaliable..'},
+                status=status.HTTP_200_OK
+            )
         
 class UserProfileViewSets(viewsets.ModelViewSet):
     queryset = UserProfile.objects.all()
