@@ -88,6 +88,7 @@ DATABASES = {
         'PORT': config('DATABASE_PORT', default='5432'),
     }
 }
+CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -138,6 +139,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'washint_server.authentication.JWTCookieAuthentication',
     )
 }
 
