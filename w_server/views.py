@@ -76,3 +76,18 @@ class UserProfileViewSets(viewsets.ModelViewSet):
         if self.request.user.is_staff:
             return self.queryset.all()
         return self.queryset.filter(user=self.request.user)
+    @action(detail=False,methods=['get'],url_path='my-profile')
+    def my_profile(self,request):
+        if not request.user.is_authenticated:
+            return Response(
+                {'detail':'authentication credentials was not provided.'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
+        user = request.user
+        try:
+            profile = UserProfile.objects.get(user=user)
+        except UserProfile.DoesNotExist:
+            profile = UserProfile.objects.create(user=user)
+        serializer = self.get_serializer(profile)
+        return Response(serializer.data)
