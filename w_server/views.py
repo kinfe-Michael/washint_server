@@ -76,6 +76,7 @@ class UserProfileViewSets(viewsets.ModelViewSet):
         if self.request.user.is_staff:
             return self.queryset.all()
         return self.queryset.filter(user=self.request.user)
+    
     @action(detail=False,methods=['get'],url_path='my-profile')
     def my_profile(self,request):
         if not request.user.is_authenticated:
@@ -91,3 +92,15 @@ class UserProfileViewSets(viewsets.ModelViewSet):
             profile = UserProfile.objects.create(user=user)
         serializer = self.get_serializer(profile)
         return Response(serializer.data)
+    @action(detail=False,methods=['get'],permission_classes=[AllowAny])
+    def user_profile(self,request):
+        username = request.query_params.get('username',None)
+        if username is None:
+            return Response({'error':{'message':'sername not provided'}},status=status.HTTP_400_BAD_REQUEST)
+        user = User.objects.get(username = username)
+        serializer = self.get_serializer(user.profile)
+        # profileData = User.objects.filter(user = userData)
+        # if not profileData: 
+            # return Response({'error':{'message':'user not found'}},status=status.HTTP_400_BAD_REQUEST)
+        return Response({'profile':serializer.data})
+
