@@ -79,6 +79,7 @@ class UserProfileViewSets(viewsets.ModelViewSet):
     
     @action(detail=False,methods=['get'],url_path='my-profile')
     def my_profile(self,request):
+        isNew = False
         if not request.user.is_authenticated:
             return Response(
                 {'detail':'authentication credentials was not provided.'},
@@ -90,8 +91,9 @@ class UserProfileViewSets(viewsets.ModelViewSet):
             profile = UserProfile.objects.get(user=user)
         except UserProfile.DoesNotExist:
             profile = UserProfile.objects.create(user=user)
+            isNew:True
         serializer = self.get_serializer(profile)
-        return Response(serializer.data)
+        return Response({'profile':serializer.data,'isNew':isNew})
     @action(detail=False,methods=['get'],permission_classes=[AllowAny])
     def user_profile(self,request):
         username = request.query_params.get('username',None)

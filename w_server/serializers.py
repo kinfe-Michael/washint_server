@@ -28,10 +28,11 @@ class UserSerializer(serializers.ModelSerializer):
         return user
 class UserProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username',read_only=True)
+    display_name = serializers.CharField(source='user.full_name',read_only=True)
     class Meta:
         model = UserProfile
         fields = [
-              'id', 'username', 'display_name', 'profile_picture_url', 
+              'id', 'username', 'display_name', 'profile_picture_url',
             'bio', 'followers_count', 'following_count',
             'created_at', 'updated_at'
         ]

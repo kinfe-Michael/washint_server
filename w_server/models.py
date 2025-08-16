@@ -7,6 +7,9 @@ from django.db import models
 
 class User(AbstractUser):
     id = models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}".strip()
 
 class UserProfile(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4,editable=False)
@@ -25,6 +28,13 @@ class Artist(models.Model):
     bio = models.TextField(null=True, blank=True)
     image_url = models.URLField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    managed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='managed_artists'
+    )
 
     def __str__(self):
         return self.name
