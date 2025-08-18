@@ -6,8 +6,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError
 
-from .models import UserProfile
-from .serializers import UserSerializer, UserProfileSerializer
+from .models import UserProfile,Artist
+from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer
 from .permissions import IsUserOrAdmin, IsOwnerOrReadOnly
 
 # CRITICAL FIX: Use get_user_model() to retrieve the active user model.
@@ -106,3 +106,9 @@ class UserProfileViewSets(viewsets.ModelViewSet):
             # return Response({'error':{'message':'user not found'}},status=status.HTTP_400_BAD_REQUEST)
         return Response({'profile':serializer.data})
 
+class ArtistViewSets(viewsets.ModelViewSet):
+    queryset = Artist.objects.all()
+    serializer_class = ArtistSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsOwnerOrReadOnly]
+    def perform_create(self, serializer):
+        serializer.save(managed_by=self.request.user)

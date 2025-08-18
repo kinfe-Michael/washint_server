@@ -5,6 +5,9 @@ import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+
+
+
 class User(AbstractUser):
     id = models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     @property
@@ -21,12 +24,15 @@ class UserProfile(models.Model):
     following_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
-class Artist(models.Model):
+class Genre(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255, unique=True)
-    bio = models.TextField(null=True, blank=True)
-    image_url = models.URLField(null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+class Artist(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    genre = models.ForeignKey(Genre,on_delete=models.SET_NULL,null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     managed_by = models.ForeignKey(
         User,
@@ -58,12 +64,7 @@ class Follow(models.Model):
 
     class Meta:
         unique_together = ('follower', 'following')
-class Genre(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=255, unique=True)
 
-    def __str__(self):
-        return self.name
 
 class Song(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
