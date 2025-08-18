@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User,UserProfile
+from .models import User,UserProfile,Artist
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -28,11 +28,25 @@ class UserSerializer(serializers.ModelSerializer):
         return user
 class UserProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username',read_only=True)
+    display_name = serializers.CharField(source='user.full_name',read_only=True)
     class Meta:
         model = UserProfile
         fields = [
-              'id', 'username', 'display_name', 'profile_picture_url', 
+              'id', 'username', 'display_name', 'profile_picture_url',
             'bio', 'followers_count', 'following_count',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'username', 'followers_count', 'following_count', 'created_at', 'updated_at']
+class ManagedByUserSerializer(serializers.ModelSerializer):
+    display_name = serializers.CharField(source='profile.display_name')
+    profile_picture_url = serializers.CharField(source='profile.profile_picture_url')
+
+    class Meta:
+        model = User
+        fields = ['id','display_name','profile_picture_url']
+
+class ArtistSerializer(serializers.ModelSerializer):
+    managed_by = ManagedByUserSerializer(read_only=True)
+    class Meta:
+        model = Artist
+        fields = ['id','genre','managed_by']
