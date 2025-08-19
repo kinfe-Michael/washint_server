@@ -9,6 +9,7 @@ from rest_framework.exceptions import ValidationError
 from .models import UserProfile,Artist
 from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer
 from .permissions import IsUserOrAdmin, IsOwnerOrReadOnly
+from washint_server.pagination import MyLimitOffsetPagination # Import the class
 
 # CRITICAL FIX: Use get_user_model() to retrieve the active user model.
 User = get_user_model()
@@ -125,3 +126,8 @@ class ArtistViewSets(viewsets.ModelViewSet):
             queryset = Artist.objects.filter(managed_by=self.request.user)
 
         return queryset
+class PublicArtistViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Artist.objects.all()
+    serializer_class = ArtistSerializer
+    permission_classes = [permissions.AllowAny]
+    pagination_class = MyLimitOffsetPagination # Add this line
