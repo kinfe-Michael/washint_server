@@ -111,4 +111,17 @@ class ArtistViewSets(viewsets.ModelViewSet):
     serializer_class = ArtistSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsOwnerOrReadOnly]
     def perform_create(self, serializer):
+        if Artist.objects.filter(managed_by=self.request.user).exists():
+            return Response(
+                {"detail": "You can only manage one artist."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         serializer.save(managed_by=self.request.user)
+    def get_queryset(self):
+        user_id = self.request.query_params.get('artist_id',None)
+        if user_id:
+            queryset = Artist.objects.filter(managed_by__id=user_id)
+        else:
+            queryset = Artist.objects.filter(managed_by=self.request.user)
+
+        return queryset
