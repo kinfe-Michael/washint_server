@@ -38,12 +38,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'username', 'followers_count', 'following_count', 'created_at', 'updated_at']
 class ManagedByUserSerializer(serializers.ModelSerializer):
-    display_name = serializers.CharField(source='profile.display_name')
     profile_picture_url = serializers.CharField(source='profile.profile_picture_url')
-
+    # name = serializers.CharField(source='profile.user.first_name')
     class Meta:
         model = User
-        fields = ['id','display_name','profile_picture_url']
+        fields = ['id','profile_picture_url']
 
 class ArtistSerializer(serializers.ModelSerializer):
     managed_by = ManagedByUserSerializer(read_only=True)
