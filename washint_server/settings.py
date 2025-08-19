@@ -140,7 +140,9 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'washint_server.authentication.JWTCookieAuthentication',
-    )
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'washint_server.pagination.MyLimitOffsetPagination',
+    'PAGE_SIZE': 20 
 }
 
 SIMPLE_JWT = {
