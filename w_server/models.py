@@ -18,7 +18,7 @@ class UserProfile(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4,editable=False)
     user = models.OneToOneField(User,on_delete=models.CASCADE,related_name='profile')
     display_name = models.CharField(max_length=255)
-    profile_picture_url = models.URLField(null=True,blank=True)
+    profile_picture_url = models.ImageField(upload_to='images/',null=True)
     bio = models.TextField(null=True,blank=True)
     followers_count = models.PositiveIntegerField(default=0)
     following_count = models.PositiveIntegerField(default=0)
@@ -73,7 +73,7 @@ class Song(models.Model):
     album = models.ForeignKey(Album, on_delete=models.SET_NULL, null=True, blank=True, related_name='songs')
     genres = models.ManyToManyField(Genre, related_name='songs', through='SongGenre')
     duration_seconds = models.PositiveIntegerField()
-    audio_file_url = models.URLField()
+    audio_file_url = models.FileField(upload_to='songs/')
     play_count = models.PositiveBigIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
