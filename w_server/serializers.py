@@ -37,6 +37,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'username', 'followers_count', 'following_count', 'created_at', 'updated_at']
+class FullUserSerializer(serializers.ModelSerializer):
+    # This field will use the UserProfileSerializer to represent the 'profile'
+    # The `source='profile'` tells DRF to look for the 'profile' attribute
+    # on the User model instance.
+    profile = UserProfileSerializer(read_only=True)
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'profile']
 class ManagedByUserSerializer(serializers.ModelSerializer):
     profile_picture_url = serializers.CharField(source='profile.profile_picture_url')
     # name = serializers.CharField(source='profile.user.first_name')
@@ -45,7 +54,7 @@ class ManagedByUserSerializer(serializers.ModelSerializer):
         fields = ['id','profile_picture_url']
 
 class ArtistSerializer(serializers.ModelSerializer):
-    managed_by = ManagedByUserSerializer(read_only=True)
+    managed_by = FullUserSerializer(read_only=True)
     class Meta:
         model = Artist
         fields = ['id','genre','managed_by']
