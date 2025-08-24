@@ -48,7 +48,6 @@ class Album(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=255)
     artist = models.ForeignKey(Artist, on_delete=models.CASCADE, related_name='albums')
-    release_date = models.DateField(null=True, blank=True)
     cover_art_url = models.URLField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -71,9 +70,10 @@ class Song(models.Model):
     title = models.CharField(max_length=255)
     artist = models.ForeignKey(Artist, on_delete=models.CASCADE, related_name='songs')
     album = models.ForeignKey(Album, on_delete=models.SET_NULL, null=True, blank=True, related_name='songs')
-    genres = models.ManyToManyField(Genre, related_name='songs', through='SongGenre')
+    genres = models.ManyToManyField(Genre, related_name='songs', through='SongGenre',null=True)
     duration_seconds = models.PositiveIntegerField()
     audio_file_url = models.FileField(upload_to='songs/')
+    credits = models.JSONField(null=True, blank=True)
     play_count = models.PositiveBigIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -133,3 +133,5 @@ class UserSubscription(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['user'], condition=models.Q(status='active'), name='one_active_subscription')
         ]
+
+# DATABASE_HOST=database-1.cn00emwscx9y.eu-north-1.rds.amazonaws.com

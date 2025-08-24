@@ -1,17 +1,20 @@
 
 from django.contrib.auth import get_user_model
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status,serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError
-
-from .models import UserProfile,Artist
-from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer
+from rest_framework.parsers import MultiPartParser, FormParser
+from .models import UserProfile,Artist,Song,Album
+from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer,SongSerializer,AlbumSerializer
 from .permissions import IsUserOrAdmin, IsOwnerOrReadOnly
 from washint_server.pagination import MyLimitOffsetPagination # Import the class
-
-# CRITICAL FIX: Use get_user_model() to retrieve the active user model.
+from django.conf import settings
+from django.http import HttpResponse
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from botocore.exceptions import ClientError
 User = get_user_model()
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -20,23 +23,19 @@ class UserViewSet(viewsets.ModelViewSet):
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    pagination_class = MyLimitOffsetPagination # Add this line
 
     def get_permissions(self):
         """
         Instantiates and returns the list of permissions that this view requires.
         """
-        # CRITICAL FIX: Handle the 'check_username' action specifically here.
         if self.action in ['create', 'check_username']:
-            # Anyone can register or check a username.
             return [permissions.AllowAny()]
         
         elif self.action == 'list':
-            # Only admins can see a list of all users.
             return [permissions.IsAdminUser()]
 
         else:
-            # For 'retrieve', 'update', 'partial_update', and 'destroy',
-            # the user must be authenticated, and either an admin or the object owner.
             return [permissions.IsAuthenticated(), IsUserOrAdmin()]
         
     @action(detail=False, methods=['get'], permission_classes=[AllowAny])
@@ -102,15 +101,14 @@ class UserProfileViewSets(viewsets.ModelViewSet):
             return Response({'error':{'message':'sername not provided'}},status=status.HTTP_400_BAD_REQUEST)
         user = User.objects.get(username = username)
         serializer = self.get_serializer(user.profile)
-        # profileData = User.objects.filter(user = userData)
-        # if not profileData: 
-            # return Response({'error':{'message':'user not found'}},status=status.HTTP_400_BAD_REQUEST)
         return Response({'profile':serializer.data})
 
 class ArtistViewSets(viewsets.ModelViewSet):
     queryset = Artist.objects.all()
     serializer_class = ArtistSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsOwnerOrReadOnly]
+    pagination_class = MyLimitOffsetPagination 
+
     def perform_create(self, serializer):
         if Artist.objects.filter(managed_by=self.request.user).exists():
             return Response(
@@ -130,4 +128,32 @@ class PublicArtistViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Artist.objects.all()
     serializer_class = ArtistSerializer
     permission_classes = [permissions.AllowAny]
-    pagination_class = MyLimitOffsetPagination # Add this line
+    pagination_class = MyLimitOffsetPagination 
+class SongViewSet(viewsets.ModelViewSet):
+    queryset = Song.objects.all()
+    serializer_class = SongSerializer
+    permission_classes = [IsOwnerOrReadOnly,IsOwnerOrReadOnly]
+    pagination_class = MyLimitOffsetPagination 
+    
+    parser_classes = (MultiPartParser, FormParser,)
+
+    def perform_create(self, serializer):
+        user = self.request.user
+
+        try:
+            artist = Artist.objects.get(managed_by=user)
+        except Artist.DoesNotExist:
+            raise ValidationError("Authenticated user does not have an associated artist profile.")
+
+        serializer.save(artist=artist)
+
+class AlbumViewSets(viewsets.ModelViewSet):
+    queryset = Album.objects.all()
+    serializer_class = AlbumSerializer
+    permission_classes = [IsOwnerOrReadOnly,IsOwnerOrReadOnly]
+    pagination_class = MyLimitOffsetPagination 
+
+    class Meta:
+        model = Album
+        fields = ['title','cover_art_url','managed_by']
+

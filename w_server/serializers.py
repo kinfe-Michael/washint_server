@@ -1,6 +1,5 @@
 from rest_framework import serializers
-from .models import User,UserProfile,Artist
-
+from .models import User,UserProfile,Artist,Song,Genre,Album
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
@@ -38,9 +37,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'username', 'followers_count', 'following_count', 'created_at', 'updated_at']
 class FullUserSerializer(serializers.ModelSerializer):
-    # This field will use the UserProfileSerializer to represent the 'profile'
-    # The `source='profile'` tells DRF to look for the 'profile' attribute
-    # on the User model instance.
     profile = UserProfileSerializer(read_only=True)
     
     class Meta:
@@ -48,7 +44,6 @@ class FullUserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'profile']
 class ManagedByUserSerializer(serializers.ModelSerializer):
     profile_picture_url = serializers.CharField(source='profile.profile_picture_url')
-    # name = serializers.CharField(source='profile.user.first_name')
     class Meta:
         model = User
         fields = ['id','profile_picture_url']
@@ -58,3 +53,65 @@ class ArtistSerializer(serializers.ModelSerializer):
     class Meta:
         model = Artist
         fields = ['id','genre','managed_by']
+class AlbumSerializer(serializers.ModelSerializer):
+    managed_by = FullUserSerializer(read_only = True)
+    class Meta:
+        model = Album
+        fields =  ['id','title','cover_art_url','managed_by']
+
+class SongCreditSerializer(serializers.Serializer):
+    role = serializers.CharField(max_length=255)
+    name = serializers.CharField(max_length=255)
+
+class SongSerializer(serializers.ModelSerializer):
+    audio_file_upload = serializers.FileField(write_only=True)
+
+    signed_audio_url = serializers.SerializerMethodField(read_only=True)
+
+    artist = serializers.ReadOnlyField(source='artist.id')
+    duration_seconds = serializers.ReadOnlyField()
+
+    genres = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Genre.objects.all(),
+    )
+    
+    credits = SongCreditSerializer(many=True, required=False, allow_null=True)
+
+    class Meta:
+        model = Song
+        fields = [
+            'id', 'title', 'album', 'genres',
+            'audio_file_upload', 'signed_audio_url', 'credits',
+            'duration_seconds', 'artist', 'play_count', 'created_at'
+        ]
+        read_only_fields = ['id', 'play_count', 'created_at']
+        
+    def get_signed_audio_url(self, obj):
+        """
+        Generates a signed URL for the song's audio file if it exists.
+        This is a common pattern for private files in a cloud storage bucket.
+        """
+        if obj.audio_file_url:
+
+            return obj.audio_file_url.url
+        return None
+
+    def create(self, validated_data):
+        audio_file = validated_data.pop('audio_file_upload')
+        genres_data = validated_data.pop('genres', [])
+        credits_data = validated_data.pop('credits', [])
+        
+        validated_data['duration_seconds'] = 300 
+
+        
+        song = Song.objects.create(audio_file_url=audio_file, **validated_data)
+        
+        if genres_data:
+            song.genres.set(genres_data)
+
+        if credits_data:
+            song.credits = credits_data
+            song.save()
+
+        return song
