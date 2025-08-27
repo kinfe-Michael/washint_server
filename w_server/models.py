@@ -71,6 +71,7 @@ class Song(models.Model):
     artist = models.ForeignKey(Artist, on_delete=models.CASCADE, related_name='songs')
     album = models.ForeignKey(Album, on_delete=models.SET_NULL, null=True, blank=True, related_name='songs')
     genres = models.ManyToManyField(Genre, related_name='songs', through='SongGenre',null=True)
+    song_cover_upload = models.ImageField(upload_to='images/',default='rtx')
     duration_seconds = models.PositiveIntegerField()
     audio_file_url = models.FileField(upload_to='songs/')
     credits = models.JSONField(null=True, blank=True)

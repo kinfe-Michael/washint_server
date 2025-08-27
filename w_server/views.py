@@ -132,7 +132,7 @@ class PublicArtistViewSet(viewsets.ReadOnlyModelViewSet):
 class SongViewSet(viewsets.ModelViewSet):
     queryset = Song.objects.all()
     serializer_class = SongSerializer
-    permission_classes = [IsOwnerOrReadOnly,IsOwnerOrReadOnly]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsOwnerOrReadOnly]
     pagination_class = MyLimitOffsetPagination 
     
     parser_classes = (MultiPartParser, FormParser,)

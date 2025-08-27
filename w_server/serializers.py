@@ -62,13 +62,18 @@ class AlbumSerializer(serializers.ModelSerializer):
 class SongCreditSerializer(serializers.Serializer):
     role = serializers.CharField(max_length=255)
     name = serializers.CharField(max_length=255)
-
+class ArtistManagedBySerializer(serializers.ModelSerializer):
+    display_name = serializers.CharField(source='full_name', read_only=True)
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'display_name']
 class SongSerializer(serializers.ModelSerializer):
     audio_file_upload = serializers.FileField(write_only=True)
-
+    song_cover_upload = serializers.ImageField(write_only=True)
     signed_audio_url = serializers.SerializerMethodField(read_only=True)
-
-    artist = serializers.ReadOnlyField(source='artist.id')
+    signed_cover_url = serializers.SerializerMethodField(read_only=True)
+    artist = ArtistManagedBySerializer(source='artist.managed_by')
     duration_seconds = serializers.ReadOnlyField()
 
     genres = serializers.PrimaryKeyRelatedField(
@@ -82,7 +87,7 @@ class SongSerializer(serializers.ModelSerializer):
         model = Song
         fields = [
             'id', 'title', 'album', 'genres',
-            'audio_file_upload', 'signed_audio_url', 'credits',
+            'audio_file_upload', 'signed_audio_url', 'song_cover_upload','signed_cover_url','credits',
             'duration_seconds', 'artist', 'play_count', 'created_at'
         ]
         read_only_fields = ['id', 'play_count', 'created_at']
@@ -96,16 +101,26 @@ class SongSerializer(serializers.ModelSerializer):
 
             return obj.audio_file_url.url
         return None
+    def get_signed_cover_url(self, obj):
+        """
+        Generates a signed URL for the song's audio file if it exists.
+        This is a common pattern for private files in a cloud storage bucket.
+        """
+        if obj.song_cover_upload:
+
+            return obj.song_cover_upload.url
+        return None
 
     def create(self, validated_data):
         audio_file = validated_data.pop('audio_file_upload')
+        cover_file = validated_data.pop('song_cover_upload')
         genres_data = validated_data.pop('genres', [])
         credits_data = validated_data.pop('credits', [])
         
         validated_data['duration_seconds'] = 300 
 
         
-        song = Song.objects.create(audio_file_url=audio_file, **validated_data)
+        song = Song.objects.create(audio_file_url=audio_file,song_cover_upload=cover_file, **validated_data)
         
         if genres_data:
             song.genres.set(genres_data)
