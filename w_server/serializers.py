@@ -61,21 +61,55 @@ class ArtistListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Artist
         fields = ['id','genre','display_name','username','profile_picture_url']
-class AlbumSerializer(serializers.ModelSerializer):
-    managed_by = FullUserSerializer(read_only = True)
-    class Meta:
-        model = Album
-        fields =  ['id','title','cover_art_url','managed_by']
-
-class SongCreditSerializer(serializers.Serializer):
-    role = serializers.CharField(max_length=255)
-    name = serializers.CharField(max_length=255)
 class ArtistManagedBySerializer(serializers.ModelSerializer):
     display_name = serializers.CharField(source='full_name', read_only=True)
     
     class Meta:
         model = User
         fields = ['id', 'username', 'display_name']
+class AlbumSerializer(serializers.ModelSerializer):
+    artist = ArtistManagedBySerializer(source='artist.managed_by',read_only=True)
+    signed_cover_art_url = serializers.SerializerMethodField(read_only=True)
+    cover_art_upload = serializers.ImageField(write_only=True)
+    class Meta:
+        model = Album
+        fields =  ['id','title','artist','cover_art_upload','signed_cover_art_url']
+    def get_signed_cover_art_url(self, obj):
+        if obj.cover_art_upload:
+            return obj.cover_art_upload.url
+        return None
+    def validate(self, data):
+        """
+        Custom validation to check for a unique album title for a specific artist.
+        """
+        # The `self.context` dictionary contains the request object.
+        # We can access the viewset instance to get the user, and then the artist.
+        user = self.context['request'].user
+        
+        try:
+            artist = Artist.objects.get(managed_by=user)
+        except Artist.DoesNotExist:
+            raise serializers.ValidationError({'error':"Authenticated user does not have an associated artist profile."})
+
+        if Album.objects.filter(artist=artist, title__iexact=data['title']).exists():
+            raise serializers.ValidationError(
+                {'error': f"An album with the title '{data['title']}' already exists for this artist."}
+            )
+        
+        data['artist'] = artist
+        
+        return data
+
+    def create(self, validated_data):
+        cover_art_file = validated_data.pop('cover_art_upload', None)
+        
+        album = Album.objects.create(cover_art_upload=cover_art_file, **validated_data)
+        return album
+
+class SongCreditSerializer(serializers.Serializer):
+    role = serializers.CharField(max_length=255)
+    name = serializers.CharField(max_length=255)
+
 class SongSerializer(serializers.ModelSerializer):
     audio_file_upload = serializers.FileField(write_only=True)
     song_cover_upload = serializers.ImageField(write_only=True)
