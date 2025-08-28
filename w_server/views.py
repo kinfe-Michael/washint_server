@@ -157,7 +157,18 @@ class SongViewSet(viewsets.ModelViewSet):
 class AlbumViewSets(viewsets.ModelViewSet):
     queryset = Album.objects.all()
     serializer_class = AlbumSerializer
-    permission_classes = [IsOwnerOrReadOnly,IsOwnerOrReadOnly]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsOwnerOrReadOnly]
     pagination_class = MyLimitOffsetPagination 
+    parser_classes = (MultiPartParser, FormParser,)
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return self.queryset.all()
+        
+        try:
+            artist = Artist.objects.get(managed_by=self.request.user)
+            return self.queryset.filter(artist=artist)
+        except Artist.DoesNotExist:
+            return self.queryset.none()
 
 
