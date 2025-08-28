@@ -7,7 +7,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
 from .models import UserProfile,Artist,Song,Album
-from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer,SongSerializer,AlbumSerializer
+from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer,SongSerializer,AlbumSerializer,ArtistListSerializer
 from .permissions import IsUserOrAdmin, IsOwnerOrReadOnly
 from washint_server.pagination import MyLimitOffsetPagination # Import the class
 from django.conf import settings
@@ -127,8 +127,15 @@ class ArtistViewSets(viewsets.ModelViewSet):
 class PublicArtistViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Artist.objects.all()
     serializer_class = ArtistSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsOwnerOrReadOnly]
     pagination_class = MyLimitOffsetPagination 
+
+    def get_serializer_class(self):
+        if(self.action == 'list'):
+            return ArtistListSerializer
+        if(self.action == 'retrieve'):
+            return ArtistSerializer
+        return ArtistSerializer
 class SongViewSet(viewsets.ModelViewSet):
     queryset = Song.objects.all()
     serializer_class = SongSerializer
@@ -153,7 +160,4 @@ class AlbumViewSets(viewsets.ModelViewSet):
     permission_classes = [IsOwnerOrReadOnly,IsOwnerOrReadOnly]
     pagination_class = MyLimitOffsetPagination 
 
-    class Meta:
-        model = Album
-        fields = ['title','cover_art_url','managed_by']
 

@@ -53,6 +53,14 @@ class ArtistSerializer(serializers.ModelSerializer):
     class Meta:
         model = Artist
         fields = ['id','genre','managed_by']
+class ArtistListSerializer(serializers.ModelSerializer):
+    display_name = serializers.CharField(source='managed_by.full_name',read_only=True)
+    username = serializers.CharField(source='managed_by.username',read_only=True)
+    profile_picture_url = serializers.CharField(source='managed_by.profile.profile_picture_url',read_only=True)
+
+    class Meta:
+        model = Artist
+        fields = ['id','genre','display_name','username','profile_picture_url']
 class AlbumSerializer(serializers.ModelSerializer):
     managed_by = FullUserSerializer(read_only = True)
     class Meta:
