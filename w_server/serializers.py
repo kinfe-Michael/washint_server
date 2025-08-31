@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User,UserProfile,Artist,Song,Genre,Album
+from .models import User,UserProfile,Artist,Song,Genre,Album,Playlist
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
@@ -82,8 +82,6 @@ class AlbumSerializer(serializers.ModelSerializer):
         """
         Custom validation to check for a unique album title for a specific artist.
         """
-        # The `self.context` dictionary contains the request object.
-        # We can access the viewset instance to get the user, and then the artist.
         user = self.context['request'].user
         
         try:
@@ -115,7 +113,7 @@ class SongSerializer(serializers.ModelSerializer):
     song_cover_upload = serializers.ImageField(write_only=True)
     signed_audio_url = serializers.SerializerMethodField(read_only=True)
     signed_cover_url = serializers.SerializerMethodField(read_only=True)
-    artist = ArtistManagedBySerializer(source='artist.managed_by')
+    artist = ArtistManagedBySerializer(source='artist.managed_by',read_only=True)
     duration_seconds = serializers.ReadOnlyField()
 
     genres = serializers.PrimaryKeyRelatedField(
@@ -172,3 +170,54 @@ class SongSerializer(serializers.ModelSerializer):
             song.save()
 
         return song
+class PlayListSerializer(serializers.ModelSerializer):
+    songs_count = serializers.PrimaryKeyRelatedField(
+        many = True,
+        queryset = Genre.objects.count(),
+        required = False
+    )
+    class Meta:
+        model = Playlist
+        fields = ['id','title','songs_count','is_public']
+    def create(self, validated_data):
+        # The user from the request context is required to set the owner.
+        user = self.context['request'].user
+        validated_data['owner'] = user
+
+        # The songs field is read_only, so we don't need to pop it.
+        # DRF's default create method will handle the rest.
+        playlist = super().create(validated_data)
+        
+        return playlist
+    
+class PlayListSerializerWithSongs(serializers.ModelSerializer):
+    songs = SongSerializer(read_only=True)
+    owner = FullUserSerializer(read_only=True)
+
+    class Meta:
+        model = Playlist
+        fields = ['id','title','songs','is_public','owner']
+    def create(self, validated_data):
+        # The user from the request context is required to set the owner.
+        user = self.context['request'].user
+        validated_data['owner'] = user
+
+        # The songs field is read_only, so we don't need to pop it.
+        # DRF's default create method will handle the rest.
+        playlist = super().create(validated_data)
+        
+        return playlist
+class PlaylistCreateSerializer(serializers.ModelSerializer):
+    """
+    A serializer for creating and updating playlists.
+    It uses PrimaryKeyRelatedField for songs.
+    """
+    songs = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Song.objects.all(),
+        required=False,
+    )
+    class Meta:
+        model = Playlist
+        fields = ['id', 'title', 'is_public', 'songs']
+        read_only_fields = ['id', 'created_at', 'updated_at']
