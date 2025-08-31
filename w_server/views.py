@@ -6,8 +6,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
-from .models import UserProfile,Artist,Song,Album
-from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer,SongSerializer,AlbumSerializer,ArtistListSerializer
+from .models import UserProfile,Artist,Song,Album,Playlist
+from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer,SongSerializer,AlbumSerializer,ArtistListSerializer,PlayListSerializer,PlayListSerializerWithSongs,PlaylistCreateSerializer
 from .permissions import IsUserOrAdmin, IsOwnerOrReadOnly
 from washint_server.pagination import MyLimitOffsetPagination # Import the class
 from django.conf import settings
@@ -159,11 +159,16 @@ class AlbumViewSets(viewsets.ModelViewSet):
     serializer_class = AlbumSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsOwnerOrReadOnly]
     pagination_class = MyLimitOffsetPagination 
-    parser_classes = (MultiPartParser, FormParser,)
+    parser_classes = (MultiPartParser, FormParser)
 
     def get_queryset(self):
-        if self.request.user.is_staff:
-            return self.queryset.all()
+        artist_id = self.request.query_params.get('artist_id', None)
+
+        if self.request.method in permissions.SAFE_METHODS:
+            if artist_id:
+                return self.queryset.filter(artist__id=artist_id)
+            else:
+                return self.queryset.all()
         
         try:
             artist = Artist.objects.get(managed_by=self.request.user)
@@ -171,4 +176,31 @@ class AlbumViewSets(viewsets.ModelViewSet):
         except Artist.DoesNotExist:
             return self.queryset.none()
 
+class PlayListViewSets(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsOwnerOrReadOnly]
+    pagination_class = MyLimitOffsetPagination 
+    def get_serializer_class(self):
+       
+        if self.action == 'list':
+            return PlayListSerializer
+        elif self.action == 'create':
+            return PlaylistCreateSerializer
+        return PlayListSerializerWithSongs
+
+    def get_queryset(self):
+       
+        queryset = Playlist.objects.filter(is_public=True)
+        
+        user = self.request.user
+        
+        if user.is_authenticated:
+            queryset = queryset | Playlist.objects.filter(is_public=False, owner=user)
+        
+        return queryset.order_by('created_at').distinct()
+    def perform_create(self, serializer):
+        # Set the owner of the playlist to the authenticated user
+        serializer.save(owner=self.request.user)
+
+    
+    
 

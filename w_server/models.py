@@ -79,7 +79,7 @@ class Song(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.title} by {self.artist.name}"
+        return f"{self.title}"
 class SongGenre(models.Model):
     song = models.ForeignKey(Song, on_delete=models.CASCADE)
     genre = models.ForeignKey(Genre, on_delete=models.CASCADE)

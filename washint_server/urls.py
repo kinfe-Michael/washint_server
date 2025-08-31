@@ -9,7 +9,7 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView, 
 )
 
-from w_server.views import UserViewSet,UserProfileViewSets,ArtistViewSets,PublicArtistViewSet,SongViewSet,AlbumViewSets
+from w_server.views import UserViewSet,UserProfileViewSets,ArtistViewSets,PublicArtistViewSet,SongViewSet,AlbumViewSets,PlayListViewSets
 
 router = DefaultRouter()
 
@@ -19,6 +19,7 @@ router.register(r'artists',ArtistViewSets,basename='artist')
 router.register(r'public-artists', PublicArtistViewSet, basename='public-artist')
 router.register(r'songs', SongViewSet, basename='song')
 router.register(r'albums',AlbumViewSets , basename='album')
+router.register(r'playlists',PlayListViewSets , basename='playlist')
 urlpatterns = [
     path('admin/', admin.site.urls),
 
