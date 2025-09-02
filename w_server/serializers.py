@@ -180,12 +180,9 @@ class PlayListSerializer(serializers.ModelSerializer):
         model = Playlist
         fields = ['id','title','songs_count','is_public']
     def create(self, validated_data):
-        # The user from the request context is required to set the owner.
         user = self.context['request'].user
         validated_data['owner'] = user
 
-        # The songs field is read_only, so we don't need to pop it.
-        # DRF's default create method will handle the rest.
         playlist = super().create(validated_data)
         
         return playlist
@@ -198,12 +195,9 @@ class PlayListSerializerWithSongs(serializers.ModelSerializer):
         model = Playlist
         fields = ['id','title','songs','is_public','owner']
     def create(self, validated_data):
-        # The user from the request context is required to set the owner.
         user = self.context['request'].user
         validated_data['owner'] = user
 
-        # The songs field is read_only, so we don't need to pop it.
-        # DRF's default create method will handle the rest.
         playlist = super().create(validated_data)
         
         return playlist
