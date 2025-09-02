@@ -1,5 +1,10 @@
 from rest_framework import serializers
-from .models import User,UserProfile,Artist,Song,Genre,Album,Playlist
+from .models import (
+    User, UserProfile, Artist, Album, Song, Genre, Playlist,
+    PlaylistSong, Follow, UserSubscription
+)
+
+# Reusing existing serializers
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
@@ -25,6 +30,7 @@ class UserSerializer(serializers.ModelSerializer):
             user.set_password(password)
             user.save()
         return user
+
 class UserProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username',read_only=True)
     display_name = serializers.CharField(source='user.full_name',read_only=True)
@@ -36,12 +42,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'username', 'followers_count', 'following_count', 'created_at', 'updated_at']
+
 class FullUserSerializer(serializers.ModelSerializer):
     profile = UserProfileSerializer(read_only=True)
     
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'profile']
+
 class ManagedByUserSerializer(serializers.ModelSerializer):
     profile_picture_url = serializers.CharField(source='profile.profile_picture_url')
     class Meta:
@@ -53,6 +61,7 @@ class ArtistSerializer(serializers.ModelSerializer):
     class Meta:
         model = Artist
         fields = ['id','genre','managed_by']
+
 class ArtistListSerializer(serializers.ModelSerializer):
     display_name = serializers.CharField(source='managed_by.full_name',read_only=True)
     username = serializers.CharField(source='managed_by.username',read_only=True)
@@ -61,12 +70,14 @@ class ArtistListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Artist
         fields = ['id','genre','display_name','username','profile_picture_url']
+
 class ArtistManagedBySerializer(serializers.ModelSerializer):
     display_name = serializers.CharField(source='full_name', read_only=True)
     
     class Meta:
         model = User
         fields = ['id', 'username', 'display_name']
+
 class AlbumSerializer(serializers.ModelSerializer):
     artist = ArtistManagedBySerializer(source='artist.managed_by',read_only=True)
     signed_cover_art_url = serializers.SerializerMethodField(read_only=True)
@@ -115,12 +126,10 @@ class SongSerializer(serializers.ModelSerializer):
     signed_cover_url = serializers.SerializerMethodField(read_only=True)
     artist = ArtistManagedBySerializer(source='artist.managed_by',read_only=True)
     duration_seconds = serializers.ReadOnlyField()
-
     genres = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=Genre.objects.all(),
     )
-    
     credits = SongCreditSerializer(many=True, required=False, allow_null=True)
 
     class Meta:
@@ -133,21 +142,11 @@ class SongSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'play_count', 'created_at']
         
     def get_signed_audio_url(self, obj):
-        """
-        Generates a signed URL for the song's audio file if it exists.
-        This is a common pattern for private files in a cloud storage bucket.
-        """
         if obj.audio_file_url:
-
             return obj.audio_file_url.url
         return None
     def get_signed_cover_url(self, obj):
-        """
-        Generates a signed URL for the song's audio file if it exists.
-        This is a common pattern for private files in a cloud storage bucket.
-        """
         if obj.song_cover_upload:
-
             return obj.song_cover_upload.url
         return None
 
@@ -156,51 +155,69 @@ class SongSerializer(serializers.ModelSerializer):
         cover_file = validated_data.pop('song_cover_upload')
         genres_data = validated_data.pop('genres', [])
         credits_data = validated_data.pop('credits', [])
-        
         validated_data['duration_seconds'] = 300 
-
-        
         song = Song.objects.create(audio_file_url=audio_file,song_cover_upload=cover_file, **validated_data)
-        
         if genres_data:
             song.genres.set(genres_data)
-
         if credits_data:
             song.credits = credits_data
             song.save()
-
         return song
-class PlayListSerializer(serializers.ModelSerializer):
-    songs_count = serializers.PrimaryKeyRelatedField(
-        many = True,
-        queryset = Genre.objects.count(),
-        required = False
-    )
+
+class PlaylistListSerializer(serializers.ModelSerializer):
+    """
+    A serializer for listing playlists, including the owner's full details
+    and a count of songs.
+    """
+    owner = FullUserSerializer(read_only=True)
+    songs_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Playlist
-        fields = ['id','title','songs_count','is_public']
-    def create(self, validated_data):
-        user = self.context['request'].user
-        validated_data['owner'] = user
+        fields = [
+            'id',
+            'title',
+            'owner',
+            'is_public',
+            'songs_count',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ('id', 'created_at', 'updated_at',)
 
-        playlist = super().create(validated_data)
-        
-        return playlist
-    
-class PlayListSerializerWithSongs(serializers.ModelSerializer):
-    songs = SongSerializer(read_only=True)
+    def get_songs_count(self, obj):
+        return obj.songs.count()
+
+
+class PlaylistDetailSerializer(serializers.ModelSerializer):
+    """
+    A serializer for a single playlist, including the owner's details
+    and a full, nested list of songs.
+    """
+    songs = serializers.SerializerMethodField()
     owner = FullUserSerializer(read_only=True)
 
     class Meta:
         model = Playlist
-        fields = ['id','title','songs','is_public','owner']
-    def create(self, validated_data):
-        user = self.context['request'].user
-        validated_data['owner'] = user
+        fields = [
+            'id',
+            'title',
+            'owner',
+            'is_public',
+            'songs',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ('id', 'created_at', 'updated_at',)
 
-        playlist = super().create(validated_data)
-        
-        return playlist
+    def get_songs(self, obj):
+        """
+        Manually serializes the songs in the playlist.
+        This prevents the AttributeError on retrieve.
+        """
+        return SongSerializer(obj.songs.all(), many=True, context=self.context).data
+
+
 class PlaylistCreateSerializer(serializers.ModelSerializer):
     """
     A serializer for creating and updating playlists.

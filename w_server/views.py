@@ -7,7 +7,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
 from .models import UserProfile,Artist,Song,Album,Playlist
-from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer,SongSerializer,AlbumSerializer,ArtistListSerializer,PlayListSerializer,PlayListSerializerWithSongs,PlaylistCreateSerializer
+from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer,SongSerializer,AlbumSerializer,ArtistListSerializer,PlaylistListSerializer,PlaylistDetailSerializer,PlaylistCreateSerializer
 from .permissions import IsUserOrAdmin, IsOwnerOrReadOnly
 from washint_server.pagination import MyLimitOffsetPagination # Import the class
 from django.conf import settings
@@ -182,16 +182,19 @@ class PlayListViewSets(viewsets.ModelViewSet):
     def get_serializer_class(self):
        
         if self.action == 'list':
-            return PlayListSerializer
+            return PlaylistListSerializer
         elif self.action == 'create':
             return PlaylistCreateSerializer
-        return PlayListSerializerWithSongs
+        return PlaylistDetailSerializer
 
     def get_queryset(self):
        
         queryset = Playlist.objects.filter(is_public=True)
         
         user = self.request.user
+        
+        if self.request.query_params.get('my-playlists') == 'true' and user.is_authenticated:
+            return Playlist.objects.filter(owner=user).order_by('created_at').distinct()
         
         if user.is_authenticated:
             queryset = queryset | Playlist.objects.filter(is_public=False, owner=user)
