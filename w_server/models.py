@@ -94,7 +94,7 @@ class Playlist(models.Model):
     songs = models.ManyToManyField(Song, through='PlaylistSong')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    cover_art_upload = models.ImageField(upload_to='images/')
     def __str__(self):
         return self.title
 
