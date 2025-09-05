@@ -171,12 +171,15 @@ class PlaylistListSerializer(serializers.ModelSerializer):
     """
     owner = FullUserSerializer(read_only=True)
     songs_count = serializers.SerializerMethodField()
-
+    cover_art_upload = serializers.ImageField(write_only=True)
+    signed_cover_art_url = serializers.SerializerMethodField(read_only=True)
     class Meta:
         model = Playlist
         fields = [
             'id',
             'title',
+            'cover_art_upload',
+            'signed_cover_art_url',
             'owner',
             'is_public',
             'songs_count',
@@ -187,7 +190,11 @@ class PlaylistListSerializer(serializers.ModelSerializer):
 
     def get_songs_count(self, obj):
         return obj.songs.count()
-
+    def get_signed_cover_art_url(self, obj):
+        if obj.cover_art_upload:
+            return obj.cover_art_upload.url
+        return None
+      
 
 class PlaylistDetailSerializer(serializers.ModelSerializer):
     """
@@ -196,12 +203,16 @@ class PlaylistDetailSerializer(serializers.ModelSerializer):
     """
     songs = serializers.SerializerMethodField()
     owner = FullUserSerializer(read_only=True)
-
+    cover_art_upload = serializers.ImageField(write_only=True)
+    signed_cover_art_url = serializers.SerializerMethodField(read_only=True)
+    
     class Meta:
         model = Playlist
         fields = [
             'id',
             'title',
+            'cover_art_upload',
+            'signed_cover_art_url',
             'owner',
             'is_public',
             'songs',
@@ -216,7 +227,10 @@ class PlaylistDetailSerializer(serializers.ModelSerializer):
         This prevents the AttributeError on retrieve.
         """
         return SongSerializer(obj.songs.all(), many=True, context=self.context).data
-
+    def get_signed_cover_art_url(self, obj):
+        if obj.cover_art_upload:
+            return obj.cover_art_upload.url
+        return None
 
 class PlaylistCreateSerializer(serializers.ModelSerializer):
     """
@@ -228,7 +242,14 @@ class PlaylistCreateSerializer(serializers.ModelSerializer):
         queryset=Song.objects.all(),
         required=False,
     )
+    cover_art_upload = serializers.ImageField(write_only=True)
+    signed_cover_art_url = serializers.SerializerMethodField(read_only=True)
     class Meta:
         model = Playlist
-        fields = ['id', 'title', 'is_public', 'songs']
+        fields = ['id',  'cover_art_upload',
+            'signed_cover_art_url', 'title', 'is_public', 'songs']
         read_only_fields = ['id', 'created_at', 'updated_at']
+    def get_signed_cover_art_url(self, obj):
+        if obj.cover_art_upload:
+            return obj.cover_art_upload.url
+        return None
