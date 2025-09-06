@@ -6,8 +6,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
-from .models import UserProfile,Artist,Song,Album,Playlist
-from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer,SongSerializer,AlbumSerializer,ArtistListSerializer,PlaylistListSerializer,PlaylistDetailSerializer,PlaylistCreateSerializer
+from .models import UserProfile,Artist,Song,Album,Playlist,PlaylistSong
+from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer,SongSerializer,AlbumSerializer,ArtistListSerializer,PlaylistListSerializer,PlaylistDetailSerializer,PlaylistCreateSerializer,AddSongToPlaylistSerializer,PlaylistSongSerializer
 from .permissions import IsUserOrAdmin, IsOwnerOrReadOnly
 from washint_server.pagination import MyLimitOffsetPagination # Import the class
 from django.conf import settings
@@ -15,6 +15,7 @@ from django.http import HttpResponse
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from botocore.exceptions import ClientError
+from django.shortcuts import get_object_or_404
 User = get_user_model()
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -203,6 +204,38 @@ class PlayListViewSets(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Set the owner of the playlist to the authenticated user
         serializer.save(owner=self.request.user)
+class PlaylistSongViewSet(viewsets.ViewSet):
+    """
+    A ViewSet for managing songs in a playlist.
+    """
+    def get_playlist(self):
+        playlist_id = self.kwargs.get('playlist_pk')
+        return get_object_or_404(Playlist, id=playlist_id)
+
+    @action(detail=False, methods=['post'], url_path='add-song')
+    def add_song(self, request, playlist_pk=None):
+        """
+        Add a song to a specific playlist.
+        """
+        playlist = self.get_playlist()
+        serializer = AddSongToPlaylistSerializer(data=request.data, context={'playlist': playlist})
+        serializer.is_valid(raise_exception=True)
+        playlist_song = serializer.save()
+        return Response(PlaylistSongSerializer(playlist_song).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['delete'], url_path='remove-song/(?P<song_pk>[^/.]+)')
+    def remove_song(self, request, playlist_pk=None, song_pk=None):
+        """
+        Remove a song from a specific playlist.
+        """
+        playlist = self.get_playlist()
+        
+        try:
+            playlist_song = PlaylistSong.objects.get(playlist=playlist, song__id=song_pk)
+            playlist_song.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except PlaylistSong.DoesNotExist:
+            return Response({"detail": "Song not found in the playlist."}, status=status.HTTP_404_NOT_FOUND)
 
     
     
