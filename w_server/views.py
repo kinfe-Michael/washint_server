@@ -176,6 +176,21 @@ class AlbumViewSets(viewsets.ModelViewSet):
             return self.queryset.filter(artist=artist)
         except Artist.DoesNotExist:
             return self.queryset.none()
+class AlbumSongViewSets(viewsets.ReadOnlyModelViewSet):
+    """
+    A nested ViewSet for listing songs within a specific album.
+    """
+    queryset = Song.objects.all()
+    serializer_class = SongSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsOwnerOrReadOnly]
+    pagination_class = MyLimitOffsetPagination 
+
+    def get_queryset(self):
+        album_pk = self.kwargs.get('album_pk')
+        
+        album = get_object_or_404(Album, id=album_pk)
+
+        return album.songs.all()
 
 class PlayListViewSets(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsOwnerOrReadOnly]
@@ -238,5 +253,16 @@ class PlaylistSongViewSet(viewsets.ViewSet):
             return Response({"detail": "Song not found in the playlist."}, status=status.HTTP_404_NOT_FOUND)
 
     
-    
+class ArtistSongViewSets(viewsets.ModelViewSet):
+    queryset = Song.objects.all()
+    serializer_class = SongSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsOwnerOrReadOnly]
+    pagination_class = MyLimitOffsetPagination 
+
+    def get_queryset(self):
+        artist_id = self.kwargs.get('artist_pk')
+        artist = get_object_or_404(Artist, id=artist_id)
+        return artist.songs.all()
+        
+
 
