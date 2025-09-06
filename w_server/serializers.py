@@ -3,6 +3,7 @@ from .models import (
     User, UserProfile, Artist, Album, Song, Genre, Playlist,
     PlaylistSong, Follow, UserSubscription
 )
+from django.db import models
 
 # Reusing existing serializers
 class UserSerializer(serializers.ModelSerializer):
@@ -253,3 +254,47 @@ class PlaylistCreateSerializer(serializers.ModelSerializer):
         if obj.cover_art_upload:
             return obj.cover_art_upload.url
         return None
+class PlaylistSongSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlaylistSong
+        fields = ['playlist', 'song', 'order']
+        # The fields 'playlist' and 'song' are write-only for creation.
+        # This prevents them from being included in the response data.
+        extra_kwargs = {
+            'playlist': {'write_only': True},
+            'song': {'write_only': True},
+        }
+
+class AddSongToPlaylistSerializer(serializers.ModelSerializer):
+    song_id = serializers.UUIDField(write_only=True)
+    order = serializers.IntegerField(required=False)
+
+    class Meta:
+        model = PlaylistSong
+        fields = ['song_id', 'order']
+
+    def create(self, validated_data):
+        playlist = self.context['playlist']
+        song_id = validated_data.get('song_id')
+        order = validated_data.get('order')
+
+        try:
+            song = Song.objects.get(id=song_id)
+        except Song.DoesNotExist:
+            raise serializers.ValidationError({"song_id": "Song not found."})
+
+        # Check if the song is already in the playlist
+        if PlaylistSong.objects.filter(playlist=playlist, song=song).exists():
+            raise serializers.ValidationError({"detail": "This song is already in the playlist."})
+
+        # If order is not provided, find the next available order number
+        if order is None:
+            max_order = PlaylistSong.objects.filter(playlist=playlist).aggregate(models.Max('order'))['order__max']
+            order = (max_order or 0) + 1
+
+        playlist_song = PlaylistSong.objects.create(
+            playlist=playlist,
+            song=song,
+            order=order
+        )
+        return playlist_song
