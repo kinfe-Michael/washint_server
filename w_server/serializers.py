@@ -34,11 +34,13 @@ class UserSerializer(serializers.ModelSerializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username',read_only=True)
-    display_name = serializers.CharField(source='user.full_name',read_only=True)
+    display_name = serializers.CharField()
+    userId = serializers.CharField(source='user.id',read_only=True)
+
     class Meta:
         model = UserProfile
         fields = [
-              'id', 'username', 'display_name', 'profile_picture_url',
+              'id', 'username', 'display_name', 'profile_picture_url','userId',
             'bio', 'followers_count', 'following_count',
             'created_at', 'updated_at'
         ]
@@ -52,26 +54,36 @@ class FullUserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'profile']
 
 class ManagedByUserSerializer(serializers.ModelSerializer):
-    profile_picture_url = serializers.CharField(source='profile.profile_picture_url')
+    profile_picture_url = serializers.SerializerMethodField(read_only=True)
     class Meta:
         model = User
         fields = ['id','profile_picture_url']
+    def get_profile_picture_url(self, obj):
+        profile = getattr(obj, 'profile', None)
+        if profile and profile.profile_picture_url:
+            return profile.profile_picture_url.url
+        return None
 
 class ArtistSerializer(serializers.ModelSerializer):
     managed_by = FullUserSerializer(read_only=True)
     class Meta:
         model = Artist
         fields = ['id','genre','managed_by']
+    
 
 class ArtistListSerializer(serializers.ModelSerializer):
     display_name = serializers.CharField(source='managed_by.full_name',read_only=True)
     username = serializers.CharField(source='managed_by.username',read_only=True)
-    profile_picture_url = serializers.CharField(source='managed_by.profile.profile_picture_url',read_only=True)
+    profile_picture_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Artist
         fields = ['id','genre','display_name','username','profile_picture_url']
-
+    def get_profile_picture_url(self, obj):
+        profile = getattr(obj.managed_by, 'profile', None)
+        if profile and profile.profile_picture_url:
+            return profile.profile_picture_url.url
+        return None
 class ArtistManagedBySerializer(serializers.ModelSerializer):
     display_name = serializers.CharField(source='full_name', read_only=True)
     
@@ -298,3 +310,24 @@ class AddSongToPlaylistSerializer(serializers.ModelSerializer):
             order=order
         )
         return playlist_song
+class FollowSerializer(serializers.ModelSerializer):
+    # This field will be used for POST requests to specify the user to follow
+    following = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    
+    class Meta:
+        model = Follow
+        fields = ['id', 'following', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+    def validate_following(self, value):
+        request_user = self.context['request'].user
+        
+        # Prevent a user from following themselves
+        if value == request_user:
+            raise serializers.ValidationError("You cannot follow yourself.")
+        
+        # Prevent a user from following someone they are already following
+        if Follow.objects.filter(follower=request_user, following=value).exists():
+            raise serializers.ValidationError("You are already following this user.")
+        
+        return value
