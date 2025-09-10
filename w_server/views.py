@@ -6,11 +6,12 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import MultiPartParser, FormParser
-from .models import UserProfile,Artist,Song,Album,Playlist,PlaylistSong
-from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer,SongSerializer,AlbumSerializer,ArtistListSerializer,PlaylistListSerializer,PlaylistDetailSerializer,PlaylistCreateSerializer,AddSongToPlaylistSerializer,PlaylistSongSerializer
+from .models import UserProfile,Artist,Song,Album,Playlist,PlaylistSong,Follow
+from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer,SongSerializer,AlbumSerializer,ArtistListSerializer,PlaylistListSerializer,PlaylistDetailSerializer,PlaylistCreateSerializer,AddSongToPlaylistSerializer,PlaylistSongSerializer,FollowSerializer
 from .permissions import IsUserOrAdmin, IsOwnerOrReadOnly
 from washint_server.pagination import MyLimitOffsetPagination # Import the class
 from django.conf import settings
+from django.db.models import F
 from django.http import HttpResponse
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
@@ -263,6 +264,79 @@ class ArtistSongViewSets(viewsets.ModelViewSet):
         artist_id = self.kwargs.get('artist_pk')
         artist = get_object_or_404(Artist, id=artist_id)
         return artist.songs.all()
+class FollowViewSet(viewsets.ModelViewSet):
+    queryset = Follow.objects.all()
+    serializer_class = FollowSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        follow_instance = serializer.save(follower=self.request.user)
+        
+        follower_profile = UserProfile.objects.get(user=follow_instance.follower)
+        following_profile = UserProfile.objects.get(user=follow_instance.following)
+
+        UserProfile.objects.filter(id=follower_profile.id).update(following_count=F('following_count') + 1)
+        UserProfile.objects.filter(id=following_profile.id).update(followers_count=F('followers_count') + 1)
+    
+    def perform_destroy(self, instance):
+        follower = instance.follower
+        following = instance.following
+        
+        try:
+            UserProfile.objects.filter(user=follower).update(following_count=F('following_count') - 1)
+            UserProfile.objects.filter(user=following).update(followers_count=F('followers_count') - 1)
+        except UserProfile.DoesNotExist:
+            pass
+            
+        instance.delete()
+        
+    def get_queryset(self):
+        return Follow.objects.filter(follower=self.request.user)
+    
+    @action(detail=False, methods=['get'])
+    def my_followers(self, request):
+        """
+        Returns a list of UserProfile objects for the users who are following me.
+        """
+        # Get the UserProfile objects of all users who follow the current user
+        followers_profiles = UserProfile.objects.filter(
+            # Traverse from UserProfile -> User -> Follow -> Follower (the current user)
+            user__following__following=request.user
+        )
+        serializer = UserProfileSerializer(followers_profiles, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def my_following(self, request):
+        """
+        Returns a list of UserProfile objects for the users I am following.
+        """
+        # Get the UserProfile objects of all users that the current user is following
+        following_profiles = UserProfile.objects.filter(
+            # Traverse from UserProfile -> User -> Follow -> Follower (the current user)
+            user__followers__follower=request.user
+        )
+        serializer = UserProfileSerializer(following_profiles, many=True, context={'request': request})
+        return Response(serializer.data)
+    @action(detail=False, methods=['get'], url_path='is-following')
+    def is_following(self, request):
+        """
+        Checks if the current user is following the user specified by `user_id` query param.
+        Example: /api/follows/is-following/?user_id=<uuid>
+        """
+        target_user_id = request.query_params.get('user_id')
+        
+        if not target_user_id:
+            return Response({"detail": "User ID not provided."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if a Follow object exists for the current user following the target user
+        is_following = Follow.objects.filter(
+            follower=request.user,
+            following_id=target_user_id
+        ).exists()
+
+        return Response({"is_following": is_following})
+
         
 
 
