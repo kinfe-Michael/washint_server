@@ -4,7 +4,8 @@ from django.db import models
 import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 
@@ -32,6 +33,7 @@ class Genre(models.Model):
         return self.name
 class Artist(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, blank=True, null=True)
     genre = models.ForeignKey(Genre,on_delete=models.SET_NULL,null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     managed_by = models.ForeignKey(
@@ -135,4 +137,4 @@ class UserSubscription(models.Model):
             models.UniqueConstraint(fields=['user'], condition=models.Q(status='active'), name='one_active_subscription')
         ]
 
-# DATABASE_HOST=database-1.cn00emwscx9y.eu-north-1.rds.amazonaws.com
+
