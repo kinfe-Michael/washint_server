@@ -1,7 +1,9 @@
-
 from django.contrib.auth import get_user_model
 from rest_framework import viewsets, permissions, status,serializers
 from rest_framework.decorators import action
+from django.contrib.postgres.search import SearchVector, SearchQuery, SearchRank
+from django.http import JsonResponse
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError
@@ -9,7 +11,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from .models import UserProfile,Artist,Song,Album,Playlist,PlaylistSong,Follow
 from .serializers import UserSerializer, UserProfileSerializer,ArtistSerializer,SongSerializer,AlbumSerializer,ArtistListSerializer,PlaylistListSerializer,PlaylistDetailSerializer,PlaylistCreateSerializer,AddSongToPlaylistSerializer,PlaylistSongSerializer,FollowSerializer
 from .permissions import IsUserOrAdmin, IsOwnerOrReadOnly
-from washint_server.pagination import MyLimitOffsetPagination # Import the class
+from washint_server.pagination import MyLimitOffsetPagination 
 from django.conf import settings
 from django.db.models import F
 from django.http import HttpResponse
@@ -117,7 +119,19 @@ class ArtistViewSets(viewsets.ModelViewSet):
                 {"detail": "You can only manage one artist."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        serializer.save(managed_by=self.request.user)
+        
+        user = self.request.user
+        artist_name = user.username
+        
+        try:
+            profile = UserProfile.objects.get(user=user)
+            if profile.display_name:
+                artist_name = profile.display_name
+        except UserProfile.DoesNotExist:
+            pass
+            
+        serializer.save(managed_by=user, name=artist_name)
+        
     def get_queryset(self):
         user_id = self.request.query_params.get('artist_id',None)
         if user_id:
@@ -218,7 +232,6 @@ class PlayListViewSets(viewsets.ModelViewSet):
         
         return queryset.order_by('created_at').distinct()
     def perform_create(self, serializer):
-        # Set the owner of the playlist to the authenticated user
         serializer.save(owner=self.request.user)
 class PlaylistSongViewSet(viewsets.ViewSet):
     """
@@ -298,9 +311,7 @@ class FollowViewSet(viewsets.ModelViewSet):
         """
         Returns a list of UserProfile objects for the users who are following me.
         """
-        # Get the UserProfile objects of all users who follow the current user
         followers_profiles = UserProfile.objects.filter(
-            # Traverse from UserProfile -> User -> Follow -> Follower (the current user)
             user__following__following=request.user
         )
         serializer = UserProfileSerializer(followers_profiles, many=True, context={'request': request})
@@ -311,9 +322,7 @@ class FollowViewSet(viewsets.ModelViewSet):
         """
         Returns a list of UserProfile objects for the users I am following.
         """
-        # Get the UserProfile objects of all users that the current user is following
         following_profiles = UserProfile.objects.filter(
-            # Traverse from UserProfile -> User -> Follow -> Follower (the current user)
             user__followers__follower=request.user
         )
         serializer = UserProfileSerializer(following_profiles, many=True, context={'request': request})
@@ -329,7 +338,6 @@ class FollowViewSet(viewsets.ModelViewSet):
         if not target_user_id:
             return Response({"detail": "User ID not provided."}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Check if a Follow object exists for the current user following the target user
         is_following = Follow.objects.filter(
             follower=request.user,
             following_id=target_user_id
@@ -337,6 +345,69 @@ class FollowViewSet(viewsets.ModelViewSet):
 
         return Response({"is_following": is_following})
 
-        
+@api_view(['GET'])
+def search(request):
+    """
+    Performs a full-text search across songs, artists, and albums using weighted ranking.
+    The query is provided via the 'q' query parameter.
+    """
+    query_string = request.GET.get('q', '')
 
+    if not query_string:
+        return JsonResponse({"results": []})
 
+    query = SearchQuery(query_string)
+
+    weights = [1.0, 0.8, 0.6, 0.4]
+
+    songs_queryset = Song.objects.annotate(
+        search_vector=SearchVector(
+            'title', weight='A', config='english'
+        ) + SearchVector(
+            'album__title', weight='B', config='english'
+        ) + SearchVector(
+            'artist__name', weight='C', config='english'
+        )
+    ).filter(search_vector=query)
+
+    songs_results = []
+    for song in songs_queryset.annotate(rank=SearchRank(F('search_vector'), query, weights=weights)).order_by('-rank')[:20]:
+        serializer = SongSerializer(song, context={'request': request})
+        songs_results.append(serializer.data)
+
+    artists_queryset = Artist.objects.annotate(
+        search_vector=SearchVector('name', weight='A', config='english')
+    ).filter(search_vector=query)
+
+    artists_results = []
+    for artist in artists_queryset.annotate(rank=SearchRank(F('search_vector'), query, weights=weights)).order_by('-rank')[:20]:
+        profile = getattr(artist.managed_by, 'profile', None)
+        signed_profile_url = profile.profile_picture_url.url if profile and profile.profile_picture_url else None
+        artists_results.append({
+            'id': artist.id,
+            'name': artist.name,
+            'rank': artist.rank,
+            'signed_profile_url': signed_profile_url,
+        })
+
+    albums_queryset = Album.objects.annotate(
+        search_vector=SearchVector('title', weight='A', config='english') + SearchVector('artist__name', weight='B', config='english')
+    ).filter(search_vector=query)
+    
+    albums_results = []
+    for album in albums_queryset.annotate(rank=SearchRank(F('search_vector'), query, weights=weights)).order_by('-rank')[:20]:
+        albums_results.append({
+            'id': album.id,
+            'title': album.title,
+            'artist_name': album.artist.name,
+            'rank': album.rank,
+            'signed_cover_art_url': album.cover_art_upload.url if album.cover_art_upload else None
+        })
+
+    results = {
+        'songs': songs_results,
+        'artists': artists_results,
+        'albums': albums_results
+    }
+
+    return JsonResponse(results)

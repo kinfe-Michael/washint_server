@@ -66,19 +66,21 @@ class ManagedByUserSerializer(serializers.ModelSerializer):
 
 class ArtistSerializer(serializers.ModelSerializer):
     managed_by = FullUserSerializer(read_only=True)
+    name = serializers.CharField(source='managed_by.full_name', read_only=True)
+
     class Meta:
         model = Artist
-        fields = ['id','genre','managed_by']
+        fields = ['id','genre','name','managed_by']
     
 
 class ArtistListSerializer(serializers.ModelSerializer):
     display_name = serializers.CharField(source='managed_by.full_name',read_only=True)
     username = serializers.CharField(source='managed_by.username',read_only=True)
     profile_picture_url = serializers.SerializerMethodField(read_only=True)
-
+    name = serializers.CharField(source='managed_by.full_name',read_only=True)
     class Meta:
         model = Artist
-        fields = ['id','genre','display_name','username','profile_picture_url']
+        fields = ['id','genre','display_name','name','username','profile_picture_url']
     def get_profile_picture_url(self, obj):
         profile = getattr(obj.managed_by, 'profile', None)
         if profile and profile.profile_picture_url:

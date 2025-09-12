@@ -9,6 +9,7 @@ from rest_framework_simplejwt.views import (
 )
 from rest_framework_nested import routers
 
+from w_server import views
 from w_server.views import (
     UserViewSet, UserProfileViewSets, ArtistViewSets, PublicArtistViewSet,
     SongViewSet, AlbumViewSets, PlayListViewSets, PlaylistSongViewSet,
@@ -37,6 +38,7 @@ api_url_patterns = router.urls + playlists_router.urls + album_router.urls + art
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/search/', views.search, name='api-search'),
     path('api/', include(api_url_patterns)),
     path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
